@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 
 class LogTripPage extends StatefulWidget {
   final String? initialSpotName;
+  final String? initialDateTime;
+  final String? initialCondition;
   final void Function(Map<String, String>) onSaveTrip;
 
   const LogTripPage({
     super.key,
     this.initialSpotName,
+    this.initialDateTime,
+    this.initialCondition,
     required this.onSaveTrip,
   });
 
@@ -16,8 +20,8 @@ class LogTripPage extends StatefulWidget {
 
 class _LogTripPageState extends State<LogTripPage> {
   late TextEditingController _spotController;
-  final TextEditingController _dateTimeController = TextEditingController();
-  final TextEditingController _conditionController = TextEditingController();
+  late TextEditingController _dateTimeController;
+  late TextEditingController _conditionController;
   final TextEditingController _notesController = TextEditingController();
 
   String? catchResult;
@@ -27,6 +31,12 @@ class _LogTripPageState extends State<LogTripPage> {
     super.initState();
     _spotController = TextEditingController(
       text: widget.initialSpotName ?? '',
+    );
+    _dateTimeController = TextEditingController(
+      text: widget.initialDateTime ?? '',
+    );
+    _conditionController = TextEditingController(
+      text: widget.initialCondition ?? '',
     );
   }
 

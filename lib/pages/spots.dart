@@ -59,6 +59,36 @@ class _SpotsPageState extends State<SpotsPage> {
     }
   }
 
+  void loadSavedSpot(String spot) {
+    _searchController.text = spot;
+    searchSpot();
+  }
+
+  void deleteSavedSpot(String spot) {
+    setState(() {
+      savedSpots.remove(spot);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Saved spot removed')),
+    );
+  }
+
+  String getCurrentDateTimeString() {
+    final now = DateTime.now();
+    final day = now.day.toString().padLeft(2, '0');
+    final month = now.month.toString().padLeft(2, '0');
+    final year = now.year.toString();
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+
+    return '$day/$month/$year $hour:$minute';
+  }
+
+  String getCurrentConditionString() {
+    return '$weather, $temperature, Wind $wind, Tide $tide';
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -135,6 +165,8 @@ class _SpotsPageState extends State<SpotsPage> {
                                 ),
                                 body: LogTripPage(
                                   initialSpotName: selectedSpot,
+                                  initialDateTime: getCurrentDateTimeString(),
+                                  initialCondition: getCurrentConditionString(),
                                   onSaveTrip: widget.onSaveTrip,
                                 ),
                               ),
@@ -180,11 +212,20 @@ class _SpotsPageState extends State<SpotsPage> {
           )
         else
           ...savedSpots.map(
-                (spot) => Card(
+            (spot) => Card(
               child: ListTile(
                 leading: const Icon(Icons.place),
                 title: Text(spot),
-                subtitle: const Text('Saved fishing spot'),
+                // trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  loadSavedSpot(spot);
+                },
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    deleteSavedSpot(spot);
+                  },
+                ),
               ),
             ),
           ),

@@ -20,7 +20,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   void addTrip(Map<String, String> trip) {
     setState(() {
       _trips.insert(0, trip);
-      _selectedIndex = 3; // switch to History tab after saving
+      _selectedIndex = 3;
     });
   }
 
@@ -31,28 +31,21 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     'Trip History',
   ];
 
-  Widget _buildCurrentPage() {
-    switch (_selectedIndex) {
-      case 0:
-        return const HomePage();
-      case 1:
-        return SpotsPage(onSaveTrip: addTrip);
-      case 2:
-        return LogTripPage(onSaveTrip: addTrip);
-      case 3:
-        return TripHistoryPage(trips: _trips);
-      default:
-        return const HomePage();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(titles[_selectedIndex]),
       ),
-      body: _buildCurrentPage(),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          const HomePage(),
+          SpotsPage(onSaveTrip: addTrip),
+          LogTripPage(onSaveTrip: addTrip),
+          TripHistoryPage(trips: _trips),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'trip_detail.dart';
 
 class TripHistoryPage extends StatelessWidget {
   final List<Map<String, String>> trips;
@@ -44,13 +45,21 @@ class TripHistoryPage extends StatelessWidget {
 
         return Card(
           child: ListTile(
-            title: Text('${trip['spot'] ?? '--'}'),
+            title: Text(trip['spot'] ?? '--'),
             subtitle: Text(
               '${trip['dateTime'] ?? '--'}\n'
                   '${trip['result'] ?? '--'} · ${trip['condition'] ?? '--'}',
             ),
             isThreeLine: true,
             trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TripDetailPage(trip: Map<String, String>.from(trip)),
+                ),
+              );
+            },
           ),
         );
       },
