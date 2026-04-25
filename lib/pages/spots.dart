@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../service/weather.dart';
 import 'log_trip.dart';
 
 class SpotsPage extends StatefulWidget {
@@ -12,6 +13,7 @@ class SpotsPage extends StatefulWidget {
 
 class _SpotsPageState extends State<SpotsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final WeatherService _weatherService = WeatherService();
 
   String? selectedSpot;
   String weather = '--';
@@ -22,9 +24,12 @@ class _SpotsPageState extends State<SpotsPage> {
   String sunset = '--';
   String summary = '--';
 
+  bool isLoading = false;
+  String? errorMessage;
+
   final List<String> savedSpots = [];
 
-  void searchSpot() {
+  Future<void> searchSpot() async {
     final query = _searchController.text.trim();
 
     if (query.isEmpty) {
@@ -32,15 +37,65 @@ class _SpotsPageState extends State<SpotsPage> {
     }
 
     setState(() {
-      selectedSpot = query;
-      weather = 'Partly Cloudy';
-      temperature = '15°C';
-      wind = '10 mph SW';
-      tide = 'Mid tide';
-      sunrise = '06:03';
-      sunset = '19:52';
-      summary = 'Fair conditions for a short fishing session.';
+      isLoading = true;
+      errorMessage = null;
     });
+
+    try {
+      final data = await _weatherService.fetchWeatherForPlace(query);
+
+      setState(() {
+        selectedSpot = data.locationName;
+        weather = data.weather;
+        temperature = data.temperature;
+        wind = data.wind;
+        tide = '--';
+        sunrise = data.sunrise;
+        sunset = data.sunset;
+        summary = buildFishingSummary(
+          weatherText: data.weather,
+          windText: data.wind,
+        );
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage ?? 'Something went wrong')),
+      );
+    }
+  }
+
+  String buildFishingSummary({
+    required String weatherText,
+    required String windText,
+  }) {
+    final lowerWeather = weatherText.toLowerCase();
+    final windValue = extractWindSpeed(windText);
+
+    if (lowerWeather.contains('thunderstorm') ||
+        lowerWeather.contains('snow') ||
+        windValue >= 25) {
+      return 'Poor conditions. Strong wind or unsettled weather may make fishing uncomfortable.';
+    }
+
+    if (lowerWeather.contains('rain') || windValue >= 15) {
+      return 'Fair conditions. Fishable, but wind or rain may affect comfort and casting.';
+    }
+
+    return 'Good conditions for a short fishing session.';
+  }
+
+  double extractWindSpeed(String windText) {
+    final match = RegExp(r'(\d+(\.\d+)?)').firstMatch(windText);
+    if (match != null) {
+      return double.tryParse(match.group(1)!) ?? 0;
+    }
+    return 0;
   }
 
   void saveCurrentSpot() {
@@ -111,11 +166,12 @@ class _SpotsPageState extends State<SpotsPage> {
                   prefixIcon: Icon(Icons.search),
                   border: OutlineInputBorder(),
                 ),
+                onSubmitted: (_) => searchSpot(),
               ),
             ),
             const SizedBox(width: 12),
             ElevatedButton(
-              onPressed: searchSpot,
+              onPressed: isLoading ? null : searchSpot,
               child: const Text('Search'),
             ),
           ],
@@ -132,6 +188,17 @@ class _SpotsPageState extends State<SpotsPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
+                if (isLoading) ...[
+                  const Center(child: CircularProgressIndicator()),
+                  const SizedBox(height: 12),
+                ],
+                if (errorMessage != null) ...[
+                  Text(
+                    'Error: $errorMessage',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Text('Location: ${selectedSpot ?? 'No spot selected'}'),
                 const SizedBox(height: 8),
                 Text('Weather: $weather'),
@@ -216,7 +283,6 @@ class _SpotsPageState extends State<SpotsPage> {
               child: ListTile(
                 leading: const Icon(Icons.place),
                 title: Text(spot),
-                // trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   loadSavedSpot(spot);
                 },
