@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../service/trip_service.dart';
 import 'home.dart';
 import 'spots.dart';
 import 'log_trip.dart';
@@ -14,12 +15,12 @@ class MainNavigationPage extends StatefulWidget {
 
 class _MainNavigationPageState extends State<MainNavigationPage> {
   int _selectedIndex = 0;
+  final TripService _tripService = TripService();
 
-  final List<Map<String, String>> _trips = [];
+  Future<void> addTrip(Map<String, String> trip) async {
+    await _tripService.addTrip(trip);
 
-  void addTrip(Map<String, String> trip) {
     setState(() {
-      _trips.insert(0, trip);
       _selectedIndex = 3;
     });
   }
@@ -43,7 +44,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           const HomePage(),
           SpotsPage(onSaveTrip: addTrip),
           LogTripPage(onSaveTrip: addTrip),
-          TripHistoryPage(trips: _trips),
+          const TripHistoryPage(),
         ],
       ),
       bottomNavigationBar: NavigationBar(

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "386021855612",
+    "project_id": "catchcheck-63803",
+    "storage_bucket": "catchcheck-63803.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:386021855612:android:a23a774fa8b07cf5e314f9",
+        "android_client_info": {
+          "package_name": "com.example.fishcast"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVNp7xx9LvuEfY1MvZNA2PQdm-FmEU8S4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

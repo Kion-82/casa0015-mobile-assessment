@@ -4,7 +4,8 @@ class LogTripPage extends StatefulWidget {
   final String? initialSpotName;
   final String? initialDateTime;
   final String? initialCondition;
-  final void Function(Map<String, String>) onSaveTrip;
+  final Future<void> Function(Map<String, String>) onSaveTrip;
+  final bool closeOnSave;
 
   const LogTripPage({
     super.key,
@@ -12,6 +13,7 @@ class LogTripPage extends StatefulWidget {
     this.initialDateTime,
     this.initialCondition,
     required this.onSaveTrip,
+    this.closeOnSave = false,
   });
 
   @override
@@ -25,16 +27,20 @@ class _LogTripPageState extends State<LogTripPage> {
   final TextEditingController _notesController = TextEditingController();
 
   String? catchResult;
+  bool isSaving = false;
 
   @override
   void initState() {
     super.initState();
+
     _spotController = TextEditingController(
       text: widget.initialSpotName ?? '',
     );
+
     _dateTimeController = TextEditingController(
       text: widget.initialDateTime ?? '',
     );
+
     _conditionController = TextEditingController(
       text: widget.initialCondition ?? '',
     );
@@ -55,7 +61,7 @@ class _LogTripPageState extends State<LogTripPage> {
     });
   }
 
-  void saveTrip() {
+  Future<void> saveTrip() async {
     final spot = _spotController.text.trim();
     final dateTime = _dateTimeController.text.trim();
     final condition = _conditionController.text.trim();
@@ -68,6 +74,10 @@ class _LogTripPageState extends State<LogTripPage> {
       return;
     }
 
+    setState(() {
+      isSaving = true;
+    });
+
     final trip = <String, String>{
       'spot': spot,
       'dateTime': dateTime.isEmpty ? 'No date entered' : dateTime,
@@ -76,15 +86,111 @@ class _LogTripPageState extends State<LogTripPage> {
       'notes': notes,
     };
 
-    widget.onSaveTrip(trip);
+    try {
+      await widget.onSaveTrip(trip);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Trip saved')),
-    );
+      if (!mounted) return;
 
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Trip saved')),
+      );
+
+      if (widget.closeOnSave && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save trip: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
     }
+  }
+
+  Widget buildPanel({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon),
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+    );
+  }
+
+  Widget buildCatchCard({
+    required String result,
+    required IconData icon,
+    required Color selectedColor,
+  }) {
+    final bool isSelected = catchResult == result;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => selectCatchResult(result),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            color: isSelected ? selectedColor.withOpacity(0.18) : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isSelected ? selectedColor : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 34,
+                color: isSelected ? selectedColor : Colors.black54,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                result,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? selectedColor : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -92,106 +198,117 @@ class _LogTripPageState extends State<LogTripPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        TextField(
-          controller: _spotController,
-          decoration: const InputDecoration(
-            labelText: 'Spot name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _dateTimeController,
-          decoration: const InputDecoration(
-            labelText: 'Date & time',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _conditionController,
-          decoration: const InputDecoration(
-            labelText: 'Auto-filled local condition',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Catch result',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => selectCatchResult('Caught'),
-                child: Card(
-                  color: catchResult == 'Caught'
-                      ? Colors.green.shade100
-                      : null,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Column(
-                      children: [
-                        Icon(Icons.sentiment_satisfied_alt, size: 32),
-                        SizedBox(height: 8),
-                        Text('Caught'),
-                      ],
+        buildPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.edit_note, color: Color(0xFF0277BD)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Log a Fishing Trip',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0D2B3E),
                     ),
                   ),
-                ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => selectCatchResult('No catch'),
-                child: Card(
-                  color: catchResult == 'No catch'
-                      ? Colors.red.shade100
-                      : null,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Column(
-                      children: [
-                        Icon(Icons.sentiment_dissatisfied, size: 32),
-                        SizedBox(height: 8),
-                        Text('No catch'),
-                      ],
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 6),
+              const Text(
+                'Record where you fished, the conditions, and the result.',
+                style: TextStyle(color: Colors.black54),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Selected: ${catchResult ?? '--'}',
-          style: const TextStyle(color: Colors.black54),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _notesController,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Notes',
-            border: OutlineInputBorder(),
+              const SizedBox(height: 20),
+              buildTextField(
+                controller: _spotController,
+                label: 'Spot name',
+                icon: Icons.place_outlined,
+              ),
+              const SizedBox(height: 14),
+              buildTextField(
+                controller: _dateTimeController,
+                label: 'Date & time',
+                icon: Icons.schedule,
+              ),
+              const SizedBox(height: 14),
+              buildTextField(
+                controller: _conditionController,
+                label: 'Local condition',
+                icon: Icons.cloud_outlined,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.photo_camera_outlined),
-          label: const Text('Add Photo (later)'),
+        const SizedBox(height: 18),
+        buildPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Catch Result',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D2B3E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  buildCatchCard(
+                    result: 'Caught',
+                    icon: Icons.sentiment_satisfied_alt,
+                    selectedColor: Colors.green,
+                  ),
+                  const SizedBox(width: 12),
+                  buildCatchCard(
+                    result: 'No catch',
+                    icon: Icons.sentiment_dissatisfied,
+                    selectedColor: Colors.red,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Selected: ${catchResult ?? '--'}',
+                style: const TextStyle(color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        buildPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Trip Notes',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D2B3E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                controller: _notesController,
+                label: 'Notes',
+                icon: Icons.notes,
+                maxLines: 4,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: saveTrip,
-          child: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('Save Trip'),
+        ElevatedButton.icon(
+          onPressed: isSaving ? null : saveTrip,
+          icon: const Icon(Icons.save_outlined),
+          label: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(isSaving ? 'Saving...' : 'Save Trip'),
           ),
         ),
       ],

@@ -9,6 +9,7 @@ class WeatherData {
   final String weather;
   final String temperature;
   final String wind;
+  final String tide;
   final String sunrise;
   final String sunset;
 
@@ -20,6 +21,7 @@ class WeatherData {
     required this.weather,
     required this.temperature,
     required this.wind,
+    required this.tide,
     required this.sunrise,
     required this.sunset,
   });
@@ -49,11 +51,26 @@ class WeatherService {
     }
 
     final location = geocodingJson['results'][0];
+
     final double latitude = (location['latitude'] as num).toDouble();
     final double longitude = (location['longitude'] as num).toDouble();
     final String timezone = location['timezone'];
     final String locationName = location['name'];
 
+    return fetchWeatherForCoordinates(
+      latitude: latitude,
+      longitude: longitude,
+      timezone: timezone,
+      locationName: locationName,
+    );
+  }
+
+  Future<WeatherData> fetchWeatherForCoordinates({
+    required double latitude,
+    required double longitude,
+    String timezone = 'auto',
+    String locationName = 'Current Location',
+  }) async {
     final forecastUri = Uri.parse(
       'https://api.open-meteo.com/v1/forecast'
           '?latitude=$latitude'
@@ -73,30 +90,79 @@ class WeatherService {
 
     final current = forecastJson['current'];
     final daily = forecastJson['daily'];
+    final actualTimezone = forecastJson['timezone'] ?? timezone;
 
     final double temperatureValue =
     (current['temperature_2m'] as num).toDouble();
+
     final double windSpeedValue =
     (current['wind_speed_10m'] as num).toDouble();
+
     final int windDirectionValue =
     (current['wind_direction_10m'] as num).toInt();
+
     final int weatherCode = (current['weather_code'] as num).toInt();
 
     final List sunriseList = daily['sunrise'];
     final List sunsetList = daily['sunset'];
 
+    final tideText = await fetchTideForCoordinates(
+      latitude: latitude,
+      longitude: longitude,
+      timezone: actualTimezone,
+    );
+
     return WeatherData(
       locationName: locationName,
       latitude: latitude,
       longitude: longitude,
-      timezone: timezone,
+      timezone: actualTimezone,
       weather: weatherCodeToText(weatherCode),
       temperature: '${temperatureValue.toStringAsFixed(1)}°C',
       wind:
       '${windSpeedValue.toStringAsFixed(1)} km/h ${windDirectionToCompass(windDirectionValue)}',
+      tide: tideText,
       sunrise: formatIsoTime(sunriseList.first.toString()),
       sunset: formatIsoTime(sunsetList.first.toString()),
     );
+  }
+
+  Future<String> fetchTideForCoordinates({
+    required double latitude,
+    required double longitude,
+    required String timezone,
+  }) async {
+    final marineUri = Uri.parse(
+      'https://marine-api.open-meteo.com/v1/marine'
+          '?latitude=$latitude'
+          '&longitude=$longitude'
+          '&current=sea_level_height_msl'
+          '&timezone=${Uri.encodeComponent(timezone)}'
+          '&forecast_days=1'
+          '&cell_selection=sea',
+    );
+
+    try {
+      final marineResponse = await http.get(marineUri);
+
+      if (marineResponse.statusCode != 200) {
+        return 'Unavailable for this location';
+      }
+
+      final marineJson = jsonDecode(marineResponse.body);
+
+      if (marineJson['current'] == null ||
+          marineJson['current']['sea_level_height_msl'] == null) {
+        return 'Unavailable for this location';
+      }
+
+      final double seaLevel =
+      (marineJson['current']['sea_level_height_msl'] as num).toDouble();
+
+      return '${seaLevel.toStringAsFixed(2)} m sea level';
+    } catch (_) {
+      return 'Unavailable for this location';
+    }
   }
 
   String formatIsoTime(String isoString) {
@@ -107,16 +173,7 @@ class WeatherService {
   }
 
   String windDirectionToCompass(int degrees) {
-    const directions = [
-      'N',
-      'NE',
-      'E',
-      'SE',
-      'S',
-      'SW',
-      'W',
-      'NW',
-    ];
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     final index = ((degrees % 360) / 45).round() % 8;
     return directions[index];
   }

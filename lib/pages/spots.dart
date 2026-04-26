@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../service/weather.dart';
+import '../service/spot_service.dart';
 import 'log_trip.dart';
 
 class SpotsPage extends StatefulWidget {
-  final void Function(Map<String, String>) onSaveTrip;
+  final Future<void> Function(Map<String, String>) onSaveTrip;
 
   const SpotsPage({super.key, required this.onSaveTrip});
 
@@ -13,7 +16,9 @@ class SpotsPage extends StatefulWidget {
 
 class _SpotsPageState extends State<SpotsPage> {
   final TextEditingController _searchController = TextEditingController();
+
   final WeatherService _weatherService = WeatherService();
+  final SpotService _spotService = SpotService();
 
   String? selectedSpot;
   String weather = '--';
@@ -25,9 +30,8 @@ class _SpotsPageState extends State<SpotsPage> {
   String summary = '--';
 
   bool isLoading = false;
+  bool isSavingSpot = false;
   String? errorMessage;
-
-  final List<String> savedSpots = [];
 
   Future<void> searchSpot() async {
     final query = _searchController.text.trim();
@@ -49,7 +53,7 @@ class _SpotsPageState extends State<SpotsPage> {
         weather = data.weather;
         temperature = data.temperature;
         wind = data.wind;
-        tide = '--';
+        tide = data.tide;
         sunrise = data.sunrise;
         sunset = data.sunset;
         summary = buildFishingSummary(
@@ -98,19 +102,37 @@ class _SpotsPageState extends State<SpotsPage> {
     return 0;
   }
 
-  void saveCurrentSpot() {
+  Future<void> saveCurrentSpot() async {
     if (selectedSpot == null) {
       return;
     }
 
-    if (!savedSpots.contains(selectedSpot)) {
-      setState(() {
-        savedSpots.add(selectedSpot!);
-      });
+    setState(() {
+      isSavingSpot = true;
+    });
+
+    try {
+      final added = await _spotService.addSpot(selectedSpot!);
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location saved')),
+        SnackBar(
+          content: Text(added ? 'Location saved' : 'Location already saved'),
+        ),
       );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save location: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSavingSpot = false;
+        });
+      }
     }
   }
 
@@ -119,14 +141,22 @@ class _SpotsPageState extends State<SpotsPage> {
     searchSpot();
   }
 
-  void deleteSavedSpot(String spot) {
-    setState(() {
-      savedSpots.remove(spot);
-    });
+  Future<void> deleteSavedSpot(String documentId) async {
+    try {
+      await _spotService.deleteSpot(documentId);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Saved spot removed')),
-    );
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved spot removed')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove saved spot: $e')),
+      );
+    }
   }
 
   String getCurrentDateTimeString() {
@@ -148,6 +178,79 @@ class _SpotsPageState extends State<SpotsPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Widget buildSavedSpotsSection() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _spotService.getSavedSpotsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Error loading saved spots: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: const [
+                  Icon(Icons.bookmark_border, size: 40, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text(
+                    'No saved spots yet',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Search for a fishing location and save it here later.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: docs.map((doc) {
+            final data = doc.data();
+            final spotName = (data['name'] ?? '').toString();
+
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.place),
+                title: Text(spotName),
+                subtitle: const Text('Tap to load current conditions'),
+                onTap: () {
+                  loadSavedSpot(spotName);
+                },
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    deleteSavedSpot(doc.id);
+                  },
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
   }
 
   @override
@@ -213,8 +316,10 @@ class _SpotsPageState extends State<SpotsPage> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: selectedSpot == null ? null : saveCurrentSpot,
-                        child: const Text('Save Spot'),
+                        onPressed: selectedSpot == null || isSavingSpot
+                            ? null
+                            : saveCurrentSpot,
+                        child: Text(isSavingSpot ? 'Saving...' : 'Save Spot'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -232,9 +337,12 @@ class _SpotsPageState extends State<SpotsPage> {
                                 ),
                                 body: LogTripPage(
                                   initialSpotName: selectedSpot,
-                                  initialDateTime: getCurrentDateTimeString(),
-                                  initialCondition: getCurrentConditionString(),
+                                  initialDateTime:
+                                  getCurrentDateTimeString(),
+                                  initialCondition:
+                                  getCurrentConditionString(),
                                   onSaveTrip: widget.onSaveTrip,
+                                  closeOnSave: true,
                                 ),
                               ),
                             ),
@@ -255,46 +363,7 @@ class _SpotsPageState extends State<SpotsPage> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        if (savedSpots.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: const [
-                  Icon(Icons.bookmark_border, size: 40, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text(
-                    'No saved spots yet',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Search for a fishing location and save it here later.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          ...savedSpots.map(
-            (spot) => Card(
-              child: ListTile(
-                leading: const Icon(Icons.place),
-                title: Text(spot),
-                onTap: () {
-                  loadSavedSpot(spot);
-                },
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () {
-                    deleteSavedSpot(spot);
-                  },
-                ),
-              ),
-            ),
-          ),
+        buildSavedSpotsSection(),
       ],
     );
   }
