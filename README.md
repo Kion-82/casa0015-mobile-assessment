@@ -3,7 +3,7 @@
 
 Fishing decisions are often made based on local environmental conditions such as weather, wind, daylight, and tide. However, this information is usually spread across different apps or websites, and fishing outcomes are often recorded informally and randomly.
 
-CatchCheck is a Flutter mobile application that will combine condition checking and trip logging in one.
+CatchCheck is a Flutter mobile application that combines condition checking and trip logging in one.
 
 ---
 # Installation
