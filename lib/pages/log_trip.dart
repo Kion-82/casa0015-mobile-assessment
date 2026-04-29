@@ -121,7 +121,7 @@ class _LogTripPageState extends State<LogTripPage> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -164,7 +164,7 @@ class _LogTripPageState extends State<LogTripPage> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            color: isSelected ? selectedColor.withOpacity(0.18) : Colors.white,
+            color: isSelected ? selectedColor.withValues(alpha: 0.18) : Colors.white,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: isSelected ? selectedColor : Colors.grey.shade300,

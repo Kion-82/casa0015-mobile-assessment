@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../service/weather.dart';
 import '../service/spot_service.dart';
 import 'log_trip.dart';

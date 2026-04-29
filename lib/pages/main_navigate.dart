@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../service/trip_service.dart';
 import 'home.dart';
 import 'spots.dart';

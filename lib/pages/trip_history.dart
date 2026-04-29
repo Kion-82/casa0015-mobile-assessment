@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../service/trip_service.dart';
 import 'trip_detail.dart';
 
@@ -36,7 +35,7 @@ class TripHistoryPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -137,7 +136,7 @@ class TripHistoryPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 16,
                       offset: const Offset(0, 7),
                     ),
@@ -153,8 +152,8 @@ class TripHistoryPage extends StatelessWidget {
                     height: 46,
                     decoration: BoxDecoration(
                       color: caught
-                          ? Colors.green.withOpacity(0.14)
-                          : Colors.red.withOpacity(0.10),
+                          ? Colors.green.withValues(alpha: 0.14)
+                          : Colors.red.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
